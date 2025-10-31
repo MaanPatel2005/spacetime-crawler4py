@@ -16,7 +16,7 @@ metrics = {
 def scraper(url, resp):
     print("Scraping:", url)
     links = extract_next_links(url, resp)
-    return [link for link in links if is_valid(link)]
+    return links
 
 def extract_next_links(url, resp):
     # Implementation required.
@@ -56,9 +56,13 @@ def extract_next_links(url, resp):
                 absolute_url = urljoin(url, href)
                 # Remove fragment part for uniqueness
                 clean_url = urldefrag(absolute_url)[0]
-                if clean_url and clean_url not in unique_pages_set:
+                if clean_url:
                     links.append(clean_url)
-                    unique_pages_set.add(clean_url)
+        
+        # Only add valid links to unique pages set
+        valid_links = [link for link in links if is_valid(link)]
+        for link in valid_links:
+            unique_pages_set.add(link)
 
         # Update metrics
         metrics['uniquePages'] = len(unique_pages_set)
@@ -131,9 +135,14 @@ def is_valid(url):
         print ("TypeError for ", parsed)
         raise
 
-TRAP_WORDS = {"calendar", "session_id"}
+TRAP_WORDS = {"calendar", "session_id"} # other variations of sessions id
 MAX_PATHS = 10
 MAX_URL_LENGTH = 200
+# repeating sequences
+# logins, protected websites
+# number of redirects
+# check for duplicating redirects
+# check for near (compare the similarities using a threshold [cosin similarity]) and exact duplicates FOR EC
 
 def checkForTraps(url):
     parsed = urlparse(url)
