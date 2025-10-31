@@ -32,3 +32,14 @@ class Worker(Thread):
                 self.frontier.add_url(scraped_url)
             self.frontier.mark_url_complete(tbd_url)
             time.sleep(self.config.time_delay)
+        
+        visited_urls, wordCounts, longestPage, subdomainCounts = scraper.metrics['uniquePages'], scraper.metrics['wordCounts'], scraper.metrics['longestPage'], scraper.metrics['subdomainCounts']
+        top_50 = self.get_top_50_words(scraper.get_Count_Frequencies())
+
+        print("Total unique URL's visited:", visited_urls)
+        print("Top 50 words:", top_50)
+        print("Longest page visited:", longestPage)
+        print("Subdomain counts:", subdomainCounts)
+    
+    def get_top_50_words(self, frequencies):
+        return heapq.nlargest(50, frequencies.items(), key=lambda x: x[1])

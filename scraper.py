@@ -2,15 +2,19 @@ import re
 from urllib.parse import urlparse, urljoin, urldefrag
 from bs4 import BeautifulSoup
 import json
+import tokenizer
 
+unique_pages_set = set()
+wordCounts = dict()
 metrics = {
-    'uniquePages': set(),
+    'uniquePages': 0,
     'wordCounts': dict(),
     'longestPage': {'url': '', 'word_count': 0},
     'subdomainCounts': dict()
 }
 
 def scraper(url, resp):
+    print("Scraping:", url)
     links = extract_next_links(url, resp)
     return [link for link in links if is_valid(link)]
 
@@ -36,23 +40,13 @@ def extract_next_links(url, resp):
         htmlContent = resp.raw_response.content.decode('utf-8', errors='ignore')
         soup = BeautifulSoup(htmlContent, 'lxml')
 
-        # Clear out JS and CSS info (style and script tags)
-        for script in soup(["script", "style"]):
-            script.decompose()
-        text = soup.get_text()
-        words = re.sub(r'\s+', ' ', text.strip()).split(" ")
+        # Use the decoded HTML string for tokenization (tokenizer also accepts bytes,
+        # but passing the decoded string is clearer and avoids byte/str surprises)
+        words = tokenizer.tokenize(htmlContent)
+        frequencies = tokenizer.computeWordFrequencies(words)
 
-        if words and len(words) < 50:
+        if words and len(words) < 50 or len(frequencies) < len(words) * 0.1:
             return links
-        unique_words = set(word.lower() for word in words)
-        if len(unique_words) < len(words) * 0.1:  # Less than 10% unique words
-            return links
-        
-        clean_words = []
-        for word in words:
-            cleaned = word.lower().strip('.,!?";()[]{}:')
-            if cleaned.isalpha() and len(cleaned) > 2 and cleaned not in {'home', 'page', 'site', 'web', 'www', 'http', 'https', 'html', 'htm'}:
-                clean_words.append(cleaned)
 
         # Extract links from the page
         for link in soup.find_all('a', href=True):
@@ -62,23 +56,27 @@ def extract_next_links(url, resp):
                 absolute_url = urljoin(url, href)
                 # Remove fragment part for uniqueness
                 clean_url = urldefrag(absolute_url)[0]
-                if clean_url and clean_url not in links:
+                if clean_url and clean_url not in unique_pages_set:
                     links.append(clean_url)
-        
+                    unique_pages_set.add(clean_url)
+
         # Update metrics
-        metrics['uniquePages'].update(link for link in links if is_valid(link))
-        for word in clean_words:
-            metrics['wordCounts'][word] = metrics['wordCounts'].get(word, 0) + 1
+        metrics['uniquePages'] = len(unique_pages_set)
+        for word, counts in frequencies.items():
+            wordCounts[word] = wordCounts.get(word, 0) + counts
         parsed_url = urlparse(resp.url)
         subdomain = parsed_url.netloc
         metrics['subdomainCounts'][subdomain] = metrics['subdomainCounts'].get(subdomain, 0) + 1
-        if len(clean_words) > metrics['longestPage']['word_count']:
-            metrics['longestPage'] = {'url': resp.url, 'word_count': len(clean_words)}
+        if len(words) > metrics['longestPage']['word_count']:
+            metrics['longestPage'] = {'url': resp.url, 'word_count': len(words)}
         
-        print(metrics)
+        # print(metrics)
         # json can't serialize sets directly, convert the set to a list first
+        # Ensure metrics reflect the up-to-date word counts and make the set
+        # of unique pages serializable.
+        metrics['wordCounts'] = wordCounts
         serializable_metrics = metrics.copy()
-        serializable_metrics['uniquePages'] = list(serializable_metrics['uniquePages'])
+        serializable_metrics['uniquePages'] = list(unique_pages_set)
         with open("metrics.json", "w") as file:
             json.dump(serializable_metrics, file, indent=4)
 
@@ -95,7 +93,7 @@ def is_valid(url):
         parsed = urlparse(url)
 
         if parsed.scheme not in set(["http", "https"]):
-            print("Couldn't get the right scheme for ", url)
+            # print("Couldn't get the right scheme for ", url)
             return False
 
         if re.match(
@@ -107,12 +105,12 @@ def is_valid(url):
             + r"|epub|dll|cnf|tgz|sha1"
             + r"|thmx|mso|arff|rtf|jar|csv"
             + r"|rm|smil|wmv|swf|wma|zip|rar|gz)$", parsed.path.lower()):
-            print("Blocked by extension filter:", url)
+            # print("Blocked by extension filter:", url)
             return False
         
         hostname = parsed.hostname
         if hostname is None:
-            print("Couldn't get the hostname for ", url)
+            # print("Couldn't get the hostname for ", url)
             return False
         
         domain_allowed = False
@@ -123,7 +121,7 @@ def is_valid(url):
                 break
         
         if not domain_allowed:
-            print("Blocked by domain filter:", url)
+            # print("Blocked by domain filter:", url)
             return False
         
         return checkForTraps(url)
@@ -162,5 +160,8 @@ def checkForTraps(url):
 
     return True
 
-p = "https://www.ics.uci.edu/"
-print(checkForTraps(p))
+def get_Count_Frequencies():
+    return wordCounts
+
+# p = "https://www.ics.uci.edu/"
+# print(checkForTraps(p))
