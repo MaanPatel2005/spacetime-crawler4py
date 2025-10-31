@@ -1,5 +1,13 @@
 import re
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urljoin, urldefrag
+import BeautifulSoup
+
+metrics = {
+    'uniquePages': set(),
+    'wordCounts': dict(),
+    'longestPage': {'url': '', 'word_count': 0},
+    'subdomainCounts': dict()
+}
 
 def scraper(url, resp):
     links = extract_next_links(url, resp)
@@ -15,7 +23,61 @@ def extract_next_links(url, resp):
     #         resp.raw_response.url: the url, again
     #         resp.raw_response.content: the content of the page!
     # Return a list with the hyperlinks (as strings) scrapped from resp.raw_response.content
-    return list()
+    links = []
+
+    # Basic checks to see if the url is valid. Validity is checked through status code and content
+    if url is None or resp.status != 200:
+        return links
+    if not resp.raw_response or not resp.raw_response.content:
+        return links
+
+    try:
+        htmlContent = resp.raw_response.content.decode('utf-8', errors='ignore')
+        soup = BeautifulSoup.BeautifulSoup(htmlContent, 'lxml')
+
+        # Clear out JS and CSS info (style and script tags)
+        for script in soup(["script", "style"]):
+            script.decompose()
+        text = soup.get_text()
+        words = re.sub(r'\s+', ' ', text.strip()).split(" ")
+
+        if words and len(words) < 50:
+            return links
+        unique_words = set(word.lower() for word in words)
+        if len(unique_words) < len(words) * 0.1:  # Less than 10% unique words
+            return links
+        
+        clean_words = []
+        for word in words:
+            cleaned = word.lower().strip('.,!?";()[]{}:')
+            if cleaned.isalpha() and len(cleaned) > 2 and cleaned not in {'home', 'page', 'site', 'web', 'www', 'http', 'https', 'html', 'htm'}:
+                clean_words.append(cleaned)
+
+        # Update metrics
+        metrics['uniquePages'].add(resp.url)
+        for word in clean_words:
+            metrics['wordCounts'][word] = metrics['wordCounts'].get(word, 0) + 1
+        parsed_url = urlparse(resp.url)
+        subdomain = parsed_url.netloc
+        metrics['subdomainCounts'][subdomain] = metrics['subdomainCounts'].get(subdomain, 0) + 1
+        if len(clean_words) > metrics['longestPage']['word_count']:
+            metrics['longestPage'] = {'url': resp.url, 'word_count': len(clean_words)}
+
+        # Extract links from the page
+        for link in soup.find_all('a', href=True):
+            href = link['href'].strip()
+            if href and not href.startswith('#'):  # Skip fragment-only links
+                # Convert relative URLs to absolute URLs
+                absolute_url = urljoin(url, href)
+                # Remove fragment part for uniqueness
+                clean_url = urldefrag(absolute_url)[0]
+                if clean_url and clean_url not in links:
+                    links.append(clean_url)
+
+    except Exception as e:
+        print(f"Error processing {url}: {e}")
+
+    return links
 
 def is_valid(url):
     # Decide whether to crawl this url or not. 
