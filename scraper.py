@@ -42,7 +42,11 @@ def extract_next_links(url, resp):
 
         # Use the decoded HTML string for tokenization (tokenizer also accepts bytes,
         # but passing the decoded string is clearer and avoids byte/str surprises)
-        words = tokenizer.tokenize(htmlContent)
+        for tag in soup(["script", "style"]):
+            tag.decompose()
+
+        page_text = soup.get_text(" ", strip=True)
+        words = tokenizer.tokenize(page_text)
         frequencies = tokenizer.computeWordFrequencies(words)
 
         if words and len(words) < 50 or len(frequencies) < len(words) * 0.1:
@@ -83,6 +87,8 @@ def extract_next_links(url, resp):
         serializable_metrics['uniquePages'] = list(unique_pages_set)
         with open("metrics.json", "w") as file:
             json.dump(serializable_metrics, file, indent=4)
+
+        write_report()
 
     except Exception as e:
         print(f"Error processing {url}: {e}")
@@ -135,7 +141,7 @@ def is_valid(url):
         print ("TypeError for ", parsed)
         raise
 
-TRAP_WORDS = {"calendar", "session_id"} # other variations of sessions id
+TRAP_WORDS = {"calendar", "session_id", "sessionid", "login", "logout", "register", "signin", "signout"} # other variations of sessions id
 MAX_PATHS = 10
 MAX_URL_LENGTH = 200
 # repeating sequences
@@ -146,23 +152,24 @@ MAX_URL_LENGTH = 200
 
 def checkForTraps(url):
     parsed = urlparse(url)
-    # print(url)
     parsed_path = parsed.path.lower()
-    # print("Checking for traps in path: ")
-    # print(parsed_path)
 
     # Check for trap words
     for trap_word in TRAP_WORDS:
         if trap_word in parsed_path:
             return False
+        
+    # Check for "doku.php" crawler trap
+    if "doku.php" in parsed_path:
+        return False
     
-
     # Check for excessive path segments
     path_segments = parsed_path[1:].split('/')
     if len(path_segments) > MAX_PATHS:
         # print("Too many path segments:", len(path_segments))
         return False
 
+    # Check for excessive URL length
     if len(url) > MAX_URL_LENGTH:
         # print("URL too long:", len(url))
         return False
@@ -172,5 +179,25 @@ def checkForTraps(url):
 def get_Count_Frequencies():
     return wordCounts
 
-# p = "https://www.ics.uci.edu/"
-# print(checkForTraps(p))
+def write_report():
+    longest_page = metrics['longestPage']
+    top_words = sorted(wordCounts.items(), key=lambda item: (-item[1], item[0]))[:50]
+    uci_subdomains = sorted(metrics['subdomainCounts'].items())
+
+    report_lines = [
+        f"UNIQUE PAGES: {metrics['uniquePages']}",
+        f"LONGEST PAGE: {longest_page['url']} ({longest_page['word_count']} words) \n"
+    ]
+
+    report_lines.append("TOP 50 WORDS:")
+    for word, count in top_words:
+        report_lines.append(f"{word}, {count}")
+    report_lines.append("\n")
+
+    report_lines.append(f"SUBDOMAINS in uci.edu: {len(uci_subdomains)} \n")
+    report_lines.append("SUBDOMAIN, UNIQUE PAGES COUNT")
+    for subdomain, count in uci_subdomains:
+        report_lines.append(f"{subdomain}, {count}")
+
+    with open("report.txt", "w", encoding="utf-8") as report_file:
+        report_file.write("\n".join(report_lines) + "\n")
