@@ -141,7 +141,11 @@ def is_valid(url):
         print ("TypeError for ", parsed)
         raise
 
-TRAP_WORDS = {"calendar", "session_id", "sessionid", "login", "logout", "register", "signin", "signout"} # other variations of sessions id
+    except ValueError:
+        print ("ValueError for ", parsed)
+        raise
+
+TRAP_WORDS = {"calendar", "session_id", "sessionid", "login", "logout", "register", "signin", "signout", "events", "event", "ical", "tribe", "pix"}
 MAX_PATHS = 10
 MAX_URL_LENGTH = 200
 # repeating sequences
@@ -156,11 +160,15 @@ def checkForTraps(url):
 
     # Check for trap words
     for trap_word in TRAP_WORDS:
-        if trap_word in parsed_path:
+        if trap_word in parsed_path or trap_word in parsed.query:
             return False
         
     # Check for "doku.php" crawler trap
     if "doku.php" in parsed_path:
+        return False
+
+    # Check for gitlab and git trap
+    if re.search(r'/git(-lab)?/', parsed_path):
         return False
     
     # Check for excessive path segments

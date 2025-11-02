@@ -1,0 +1,64 @@
+UNIQUE PAGES: 4740 
+
+LONGEST PAGE: https://isg.ics.uci.edu/events/tag/talk/list/?eventDisplay=past&ical=1 (7838 words) 
+
+TOP 50 WORDS:
+events, 15923
+2025, 7465
+isg, 7193
+day, 5874
+talks, 5737
+search, 5710
+2024, 5443
+0, 3521
+reunion, 3504
+outlook, 3448
+next, 3321
+may, 2841
+research, 2817
+august, 2716
+uci, 2677
+ics, 2655
+13, 2651
+19, 2651
+us, 2544
+faculty, 2511
+award, 2462
+news, 2454
+calendar, 2397
+received, 2384
+db, 2358
+upcoming, 2285
+enter, 2284
+navigation, 2257
+views, 2243
+jump, 2237
+export, 2235
+file, 2232
+keyword, 2232
+scheduled, 2122
+2023, 1977
+systems, 1640
+uc, 1454
+information, 1453
+irvine, 1418
+event, 1332
+group, 1270
+contact, 1255
+view, 1253
+alumni, 1251
+students, 1250
+month, 1246
+follow, 1236
+future, 1236
+staff, 1233
+projects, 1227
+
+
+SUBDOMAINS in "uci.edu": 5
+SUBDOMAIN, UNIQUE PAGES COUNT:
+cs.ics.uci.edu, 1
+cs.uci.edu, 1
+ics.uci.edu, 18
+isg.ics.uci.edu, 1182
+www.stat.uci.edu, 28
